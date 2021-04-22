@@ -27,6 +27,8 @@ import (
 //sys hcnQueryNetworkProperties(network hcnNetwork, query string, properties **uint16, result **uint16) (hr error) = computenetwork.HcnQueryNetworkProperties?
 //sys hcnDeleteNetwork(id *_guid, result **uint16) (hr error) = computenetwork.HcnDeleteNetwork?
 //sys hcnCloseNetwork(network hcnNetwork) (hr error) = computenetwork.HcnCloseNetwork?
+//sys hcsRegisterNetworkCallback(network hcnNetwork, callback uintptr, context uintptr, callbackHandle *hcnCallbackHandle) (hr error) = computenetwork.HcnRegisterNetworkCallback?
+//sys hcsUnregisterNetworkCallback(callbackHandle hcnCallbackHandle) (hr error) = computenetwork.HcnUnregisterNetworkCallback?
 
 // Endpoint
 //sys hcnEnumerateEndpoints(query string, endpoints **uint16, result **uint16) (hr error) = computenetwork.HcnEnumerateEndpoints?
@@ -57,7 +59,7 @@ import (
 
 // Service
 //sys hcnOpenService(service *hcnService, result **uint16) (hr error) = computenetwork.HcnOpenService?
-//sys hcnRegisterServiceCallback(service hcnService, callback int32, context int32, callbackHandle *hcnCallbackHandle) (hr error) = computenetwork.HcnRegisterServiceCallback?
+//sys hcnRegisterServiceCallback(callback uintptr, context uintptr, callbackHandle *hcnCallbackHandle) (hr error) = computenetwork.HcnRegisterServiceCallback?
 //sys hcnUnregisterServiceCallback(callbackHandle hcnCallbackHandle) (hr error) = computenetwork.HcnUnregisterServiceCallback?
 //sys hcnCloseService(service hcnService) (hr error) = computenetwork.HcnCloseService?
 

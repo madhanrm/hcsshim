@@ -3,9 +3,14 @@ package hcsshim
 import (
 	"context"
 	"encoding/json"
-	"github.com/Microsoft/hcsshim/internal/hcs"
-	hcsschema "github.com/Microsoft/hcsshim/internal/schema2"
+	"path"
 	"time"
+
+	"github.com/Microsoft/hcsshim/hcn"
+	"github.com/Microsoft/hcsshim/internal/hcs"
+	"github.com/Microsoft/hcsshim/internal/requesttype"
+	"github.com/Microsoft/hcsshim/internal/schema1"
+	hcsschema "github.com/Microsoft/hcsshim/internal/schema2"
 )
 
 type VirtualMachineSpec struct {
@@ -90,6 +95,26 @@ func getHcsSpec(system *hcs.System) *hcsschema.ComputeSystem {
 	}
 	// FixMe - return proper Compute System schema
 	return nil
+}
+
+func GetVirtualMachineState(id string) string {
+	properties, err := GetVirtualMachineProperties(id)
+	if err != nil {
+		return ""
+	}
+	return properties.State
+}
+
+func GetVirtualMachineProperties(id string) (*schema1.ContainerProperties, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Minute)
+	defer cancel()
+	system, err := hcs.OpenComputeSystem(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	defer system.Close()
+
+	return system.Properties(ctx)
 }
 
 func GetVirtualMachineSpec(id string) (*VirtualMachineSpec, error) {
@@ -218,6 +243,19 @@ func (vm *VirtualMachineSpec) Delete() error {
 	return system.Terminate(ctx)
 }
 
+// Wait for a Virtual Machine exits
+func (vm *VirtualMachineSpec) Wait() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Minute)
+	defer cancel()
+	system, err := hcs.OpenComputeSystem(ctx, vm.ID)
+	if err != nil {
+		return err
+	}
+	defer system.Close()
+
+	return system.Wait()
+}
+
 // ExecuteCommand executes a command in the Virtual Machine
 func (vm *VirtualMachineSpec) ExecuteCommand(command string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Minute)
@@ -227,6 +265,67 @@ func (vm *VirtualMachineSpec) ExecuteCommand(command string) error {
 		return err
 	}
 	defer system.Close()
+
+	return nil
+}
+
+func (vm *VirtualMachineSpec) HotAttachEndpoints(endpoints []*hcn.HostComputeEndpoint) (err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Minute)
+	defer cancel()
+	system, err := hcs.OpenComputeSystem(ctx, vm.ID)
+	if err != nil {
+		return err
+	}
+	defer system.Close()
+
+	for _, endpoint := range endpoints {
+		if err = vm.hotAttachEndpoint(ctx, system, endpoint); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (vm *VirtualMachineSpec) HotDetachEndpoint(endpoint *hcn.HostComputeEndpoint) (err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Minute)
+	defer cancel()
+	system, err := hcs.OpenComputeSystem(ctx, vm.ID)
+	if err != nil {
+		return err
+	}
+	defer system.Close()
+
+	// Hot detach an endpoint from the compute system
+	request := hcsschema.ModifySettingRequest{
+		RequestType:  requesttype.Remove,
+		ResourcePath: path.Join("VirtualMachine/Devices/NetworkAdapters", endpoint.Id),
+		Settings: hcsschema.NetworkAdapter{
+			EndpointId: endpoint.Id,
+			MacAddress: endpoint.MacAddress,
+		},
+	}
+
+	if err = system.Modify(ctx, request); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (vm *VirtualMachineSpec) hotAttachEndpoint(ctx context.Context, system *hcs.System, endpoint *hcn.HostComputeEndpoint) (err error) {
+	// Hot attach an endpoint to the compute system
+	request := hcsschema.ModifySettingRequest{
+		RequestType:  requesttype.Add,
+		ResourcePath: path.Join("VirtualMachine/Devices/NetworkAdapters", endpoint.Id),
+		Settings: hcsschema.NetworkAdapter{
+			EndpointId: endpoint.Id,
+			MacAddress: endpoint.MacAddress,
+		},
+	}
+
+	if err = system.Modify(ctx, request); err != nil {
+		return err
+	}
 
 	return nil
 }
